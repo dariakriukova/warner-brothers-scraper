@@ -41,13 +41,14 @@ def check_for_july_availability():
     # Check if the first month in the calendar is July
     month_dropdown = driver.find_element(By.NAME, "ctl00$ContentPlaceHolder$SalesChannelDetailControl$EventsDateTimeSelectorModal$EventsDateTimeSelector$CalendarSelector$MonthDropDownList")
     selected_month = month_dropdown.find_element(By.CSS_SELECTOR, "option[selected]").text
+    available_dates = []
     if selected_month == "July":
         days = driver.find_elements(By.CSS_SELECTOR, ".calendar-body .day.available")
         for day in days:
             aria_label = day.get_attribute("aria-label")
             if aria_label and "07/2024" in aria_label:
-                return True
-    return False
+                available_dates.append(aria_label)
+    return available_dates
 
 def switch_month(month):
     # Switch to the specified month if not already selected
@@ -58,7 +59,8 @@ def switch_month(month):
         for option in month_options:
             if option.text == month:
                 option.click()
-                time.sleep(2)  # Wait for the calendar to update
+                print(f"Switched to {month}")
+                time.sleep(5)  # Wait for the calendar to update
                 break
 
 # Function to simulate user activity
@@ -71,11 +73,11 @@ def simulate_user_activity():
 try:
     while True:
         switch_month("July")
-        if check_for_july_availability():
-            message = "Available spots in July for Warner Brothers Studio Tour!"
+        available_dates = check_for_july_availability()
+        if available_dates:
+            message = f"Available spots in July for Warner Brothers Studio Tour on: {', '.join(available_dates)}"
             print(message)
             send_telegram_message(message)
-            break  # Stop monitoring after finding available dates
         else:
             print("No available dates in July.")
 
