@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 import time
 import os
 from dotenv import load_dotenv
+from selenium.common.exceptions import NoSuchElementException
 
 # Load environment variables from .env file
 load_dotenv()
@@ -70,11 +71,23 @@ def simulate_user_activity():
     driver.execute_script("window.scrollTo(0, 0);")
     print("Simulated user activity to keep the session alive.")
 
+# Function to extend session if the button appears
+def extend_session():
+    try:
+        extend_button = driver.find_element(By.CSS_SELECTOR, "button.ui-control.button.extendSession")
+        extend_button.click()
+        print("Extended session by clicking the button.")
+        time.sleep(2)  # Wait a moment after clicking the button
+    except NoSuchElementException:
+        print("Extend session button not found, continuing monitoring.")
+
 # Set to store already notified dates
 notified_dates = set()
 
 try:
     while True:
+        extend_session()  # Check and click the extend session button if it appears
+        
         switch_month("July")
         available_dates = check_for_july_availability()
         new_dates = [date for date in available_dates if date not in notified_dates]
@@ -90,7 +103,7 @@ try:
         print("Switched to August to maintain activity.")
 
         simulate_user_activity()  # Simulate user activity to keep the session alive
-        time.sleep(3)  # Wait for 1 minute before checking again
+        time.sleep(2)  # Wait for 1 minute before checking again
 
 except KeyboardInterrupt:
     print("Monitoring stopped.")
