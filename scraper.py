@@ -70,16 +70,21 @@ def simulate_user_activity():
     driver.execute_script("window.scrollTo(0, 0);")
     print("Simulated user activity to keep the session alive.")
 
+# Set to store already notified dates
+notified_dates = set()
+
 try:
     while True:
         switch_month("July")
         available_dates = check_for_july_availability()
-        if available_dates:
-            message = f"Available spots in July for Warner Brothers Studio Tour on: {', '.join(available_dates)}"
+        new_dates = [date for date in available_dates if date not in notified_dates]
+        if new_dates:
+            message = f"Available spots in July for Warner Brothers Studio Tour on: {', '.join(new_dates)}"
             print(message)
             send_telegram_message(message)
+            notified_dates.update(new_dates)  # Add new dates to the notified set
         else:
-            print("No available dates in July.")
+            print("No new available dates in July.")
 
         switch_month("August")
         print("Switched to August to maintain activity.")
