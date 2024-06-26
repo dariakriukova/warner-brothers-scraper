@@ -5,6 +5,7 @@ import time
 import os
 from dotenv import load_dotenv
 from selenium.common.exceptions import NoSuchElementException
+from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()
@@ -48,8 +49,21 @@ def check_for_july_availability():
         for day in days:
             aria_label = day.get_attribute("aria-label")
             if aria_label and "07/2024" in aria_label:
-                available_dates.append(aria_label)
+                available_dates.append(aria_label.strip())
     return available_dates
+
+def filter_dates(dates, start_date, end_date):
+    start = datetime.strptime(start_date, "%d/%m/%Y")
+    end = datetime.strptime(end_date, "%d/%m/%Y")
+    filtered_dates = []
+    for date in dates:
+        try:
+            date_obj = datetime.strptime(date, "%d/%m/%Y")
+            if start <= date_obj <= end:
+                filtered_dates.append(date)
+        except ValueError as e:
+            print(f"Error parsing date {date}: {e}")
+    return filtered_dates
 
 def switch_month(month):
     # Switch to the specified month if not already selected
@@ -84,26 +98,31 @@ def extend_session():
 # Set to store already notified dates
 notified_dates = set()
 
+# Date range for notifications
+start_date = "19/07/2024"
+end_date = "22/07/2024"
+
 try:
     while True:
         extend_session()  # Check and click the extend session button if it appears
         
         switch_month("July")
         available_dates = check_for_july_availability()
-        new_dates = [date for date in available_dates if date not in notified_dates]
+        filtered_dates = filter_dates(available_dates, start_date, end_date)
+        new_dates = [date for date in filtered_dates if date not in notified_dates]
         if new_dates:
             message = f"Available spots in July for Warner Brothers Studio Tour on: {', '.join(new_dates)}"
             print(message)
             send_telegram_message(message)
             notified_dates.update(new_dates)  # Add new dates to the notified set
         else:
-            print("No new available dates in July.")
+            print("No new available dates in the specified range for July.")
 
         switch_month("August")
         print("Switched to August to maintain activity.")
 
         simulate_user_activity()  # Simulate user activity to keep the session alive
-        time.sleep(2)  # Wait for 1 minute before checking again
+        time.sleep(3)
 
 except KeyboardInterrupt:
     print("Monitoring stopped.")
