@@ -6,7 +6,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import os
 from dotenv import load_dotenv
-from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException
+from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException
 from datetime import datetime
 
 # Load environment variables from .env file
@@ -156,6 +156,8 @@ def add_to_basket():
         )
     except NoSuchElementException:
         print("Add to basket button not found, could not add tickets to basket.")
+    except TimeoutException:
+        print("Timed out waiting for basket confirmation, assuming add to basket was successful.")
 
 # Function to decline additional items or proceed to next step
 def handle_additional_items():
@@ -225,7 +227,6 @@ try:
             
             send_telegram_message("Ticket is in the basket.")
             print("Ticket added to basket. Please continue the purchase manually.")
-            break  # Exit the loop after adding tickets to the basket
         else:
             print("No available dates within the specified range in July.")
         
@@ -253,9 +254,6 @@ try:
             
             send_telegram_message("Ticket is in the basket.")
             print("Ticket added to basket. Please continue the purchase manually.")
-            break  # Exit the loop after adding tickets to the basket
-        else:
-            print("No available dates within the specified range in August.")
         
         # Wait for some time before checking again
         WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
