@@ -8,6 +8,7 @@ requests = "*"
 selenium = "*"
 dotenv-python = "*"
 python-dotenv = "*"
+python-dateutil = "*"
 
 [dev-packages]
 
