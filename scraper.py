@@ -196,8 +196,8 @@ def click_continue_button():
 notified_dates = set()
 
 # Date range for notifications
-start_date = "10/07/2024"
-end_date = "31/07/2024"
+start_date = "20/07/2024"
+end_date = "22/07/2024"
 
 # Function to save the current page source to a file
 def save_html_snapshot(filename="error_page.html"):
