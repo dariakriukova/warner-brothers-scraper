@@ -6,7 +6,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import os
 from dotenv import load_dotenv
-from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException, StaleElementReferenceException
 from datetime import datetime
 
 # Load environment variables from .env file
@@ -196,8 +196,14 @@ def click_continue_button():
 notified_dates = set()
 
 # Date range for notifications
-start_date = "20/07/2024"
-end_date = "22/07/2024"
+start_date = "10/07/2024"
+end_date = "31/07/2024"
+
+# Function to save the current page source to a file
+def save_html_snapshot(filename="error_page.html"):
+    with open(filename, "w", encoding="utf-8") as file:
+        file.write(driver.page_source)
+    print(f"Saved HTML snapshot to {filename}")
 
 try:
     extend_session()  # Check and click the extend session button if it appears
@@ -227,8 +233,6 @@ try:
             
             send_telegram_message("Ticket is in the basket.")
             print("Ticket added to basket. Please continue the purchase manually.")
-        else:
-            print("No available dates within the specified range in July.")
         
         switch_month("August")
         available_dates = check_for_july_availability()
@@ -259,6 +263,9 @@ try:
         WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
         simulate_user_activity()
         extend_session()
+except (NoSuchElementException, TimeoutException, StaleElementReferenceException) as e:
+    print(f"An error occurred: {e}")
+    save_html_snapshot()
 except KeyboardInterrupt:
     print("Monitoring stopped.")
     send_telegram_message("Monitoring stopped.")
