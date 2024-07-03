@@ -16,7 +16,7 @@ This project is a web scraper designed to automate the process of checking and b
 1. **Clone the repository**
 
     ```bash
-    git clone https://github.com/yourusername/warner-brothers-scraper.git
+    git clone https://https://github.com/dariakriukova/warner-brothers-scraper
     cd warner-brothers-scraper
     ```
 
