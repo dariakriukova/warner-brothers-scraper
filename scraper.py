@@ -1,37 +1,14 @@
-import requests
+import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import time
-import os
-from dotenv import load_dotenv
-from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException, TimeoutException, StaleElementReferenceException
-from datetime import datetime
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException, TimeoutException, ElementClickInterceptedException
+from utils import send_telegram_message, extend_session, filter_dates
 
-# Load environment variables from .env file
-load_dotenv()
-
-# Telegram bot token and chat ID from environment variables
-bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
-chat_id = os.getenv('TELEGRAM_CHAT_ID')
-
-# Function to send message to Telegram
-def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {
-        'chat_id': chat_id,
-        'text': message
-    }
-    requests.post(url, data=payload)
-
-# Set up the WebDriver (Assuming you have the appropriate driver for your browser)
 driver = webdriver.Chrome()  # or webdriver.Firefox() or another browser's driver
 
-# URL to the ticket purchasing page
 ticket_url = "https://tickets.wbstudiotour.co.uk/webstore/shop/viewitems.aspx?cg=hptst2&c=tix2"
-
-# Open the ticket purchasing page
 driver.get(ticket_url)
 
 def reject_cookies():
@@ -52,16 +29,7 @@ def reject_cookies():
     except Exception as e:
         print(f"An error occurred while rejecting cookies: {e}")
 
-reject_cookies()
-
-# Find and click the button to select date and time
-select_date_button = WebDriverWait(driver, 10).until(
-    EC.element_to_be_clickable((By.CSS_SELECTOR, "button.shared-calendar-button"))
-)
-select_date_button.click()
-
 def check_for_availability(month):
-    # Check if the specified month is displayed in the calendar
     month_dropdown = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder$SalesChannelDetailControl$EventsDateTimeSelectorModal$EventsDateTimeSelector$CalendarSelector$MonthDropDownList"))
     )
@@ -75,56 +43,35 @@ def check_for_availability(month):
                 available_dates.append(aria_label.strip())
     return available_dates
 
-def filter_dates(dates, start_date, end_date):
-    start = datetime.strptime(start_date, "%d/%m/%Y")
-    end = datetime.strptime(end_date, "%d/%m/%Y")
-    filtered_dates = []
-    for date in dates:
+def switch_month(month, retries=3):
+    for attempt in range(retries):
         try:
-            date_obj = datetime.strptime(date, "%d/%m/%Y")
-            if start <= date_obj <= end:
-                filtered_dates.append(date)
-        except ValueError as e:
-            print(f"Error parsing date {date}: {e}")
-    return filtered_dates
+            month_dropdown = WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder$SalesChannelDetailControl$EventsDateTimeSelectorModal$EventsDateTimeSelector$CalendarSelector$MonthDropDownList"))
+            )
+            selected_option = month_dropdown.find_element(By.CSS_SELECTOR, "option[selected]").text
+            if selected_option != month:
+                month_options = month_dropdown.find_elements(By.TAG_NAME, "option")
+                for option in month_options:
+                    if option.text == month:
+                        option.click()
+                        print(f"Switched to {month}")
+                        WebDriverWait(driver, 20).until(
+                            EC.text_to_be_present_in_element((By.CSS_SELECTOR, "option[selected]"), month)
+                        )
+                        return
+            else:
+                print(f"Already on {month}")
+                return
+        except TimeoutException as e:
+            print(f"TimeoutException on attempt {attempt + 1} while switching to {month}: {e}")
+        except Exception as e:
+            print(f"Exception on attempt {attempt + 1} while switching to {month}: {e}")
+        time.sleep(2)  # Wait before retrying
+    print(f"Failed to switch to {month} after {retries} attempts")
 
-def switch_month(month):
-    # Switch to the specified month if not already selected
-    month_dropdown = WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.NAME, "ctl00$ContentPlaceHolder$SalesChannelDetailControl$EventsDateTimeSelectorModal$EventsDateTimeSelector$CalendarSelector$MonthDropDownList"))
-    )
-    selected_option = month_dropdown.find_element(By.CSS_SELECTOR, "option[selected]").text
-    if selected_option != month:
-        month_options = month_dropdown.find_elements(By.TAG_NAME, "option")
-        for option in month_options:
-            if option.text == month:
-                option.click()
-                print(f"Switched to {month}")
-                WebDriverWait(driver, 10).until(
-                    EC.text_to_be_present_in_element((By.CSS_SELECTOR, "option[selected]"), month)
-                )
-                break
-
-# Function to simulate user activity
-def simulate_user_activity():
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    time.sleep(0.5)
-    driver.execute_script("window.scrollTo(0, 0);")
-    print("Simulated user activity to keep the session alive.")
-
-# Function to extend session if the button appears
-def extend_session():
-    try:
-        extend_button = driver.find_element(By.CSS_SELECTOR, "button.ui-control.button.extendSession")
-        extend_button.click()
-        print("Extended session by clicking the button.")
-    except NoSuchElementException:
-        print("Extend session button not found, continuing monitoring.")
-
-# Function to click the first available time slot for a given date
 def select_first_available_time_for_date(target_date):
     try:
-        # Find the target date element and click it
         day_elements = driver.find_elements(By.CSS_SELECTOR, ".calendar-body .day.available")
         for day_element in day_elements:
             aria_label = day_element.get_attribute("aria-label")
@@ -132,7 +79,6 @@ def select_first_available_time_for_date(target_date):
                 day_element.click()
                 break
         
-        # Select the first available time slot for the selected date
         select_time_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "button.ui-control.button.select-time"))
         )
@@ -141,7 +87,6 @@ def select_first_available_time_for_date(target_date):
     except NoSuchElementException:
         print("Select time button not found, could not select time for the date:", target_date)
 
-# Function to increase the quantity of tickets
 def increase_ticket_quantity():
     try:
         increase_quantity_button = WebDriverWait(driver, 10).until(
@@ -155,7 +100,6 @@ def increase_ticket_quantity():
         print("Stale element reference exception caught. Retrying to increase ticket quantity.")
         increase_ticket_quantity()
 
-# Function to add tickets to basket
 def add_to_basket():
     try:
         add_to_basket_button = WebDriverWait(driver, 10).until(
@@ -171,7 +115,6 @@ def add_to_basket():
     except TimeoutException:
         print("Timed out waiting for basket confirmation, assuming add to basket was successful.")
 
-# Function to decline additional items or proceed to next step
 def handle_additional_items():
     try:
         decline_button = WebDriverWait(driver, 10).until(
@@ -188,7 +131,6 @@ def handle_additional_items():
     except Exception as e:
         print(f"An error occurred: {e}")
 
-# Function to click the continue button within the specified element
 def click_continue_button():
     try:
         continue_button = WebDriverWait(driver, 10).until(
@@ -203,81 +145,3 @@ def click_continue_button():
         print("Continue button not found, could not proceed.")
     except Exception as e:
         print(f"An error occurred: {e}")
-
-# Set to store already notified dates
-notified_dates = set()
-
-# Date range for notifications
-start_date = "10/07/2024"
-end_date = "30/07/2024"
-
-try:
-    extend_session()  # Check and click the extend session button if it appears
-    
-    while True:
-        switch_month("July")
-        available_dates = check_for_availability("July")
-        filtered_dates = filter_dates(available_dates, start_date, end_date)
-        new_dates = [date for date in filtered_dates if date not in notified_dates]
-        if new_dates:
-            for target_date in new_dates:
-                message = f"Available spots in July for Warner Brothers Studio Tour on: {target_date}"
-                print(message)
-                send_telegram_message(message)
-                notified_dates.add(target_date)  # Add the date to the notified set
-                
-                # Automate ticket selection and purchase
-                select_first_available_time_for_date(target_date)
-                increase_ticket_quantity()
-                add_to_basket()
-                
-                # Handle additional items pages
-                handle_additional_items()
-                handle_additional_items()
-                
-                # Click the final continue button
-                click_continue_button()
-                
-                send_telegram_message("Ticket is in the basket.")
-                print("Ticket added to basket. Please continue the purchase manually.")
-        
-        switch_month("August")
-        available_dates = check_for_availability("August")
-        filtered_dates = filter_dates(available_dates, start_date, end_date)
-        new_dates = [date for date in filtered_dates if date not in notified_dates]
-        if new_dates:
-            for target_date in new_dates:
-                message = f"Available spots in August for Warner Brothers Studio Tour on: {target_date}"
-                print(message)
-                send_telegram_message(message)
-                notified_dates.add(target_date)  # Add the date to the notified set
-                
-                # Automate ticket selection and purchase
-                select_first_available_time_for_date(target_date)
-                increase_ticket_quantity()
-                add_to_basket()
-                
-                # Handle additional items pages
-                handle_additional_items()
-                handle_additional_items()
-                
-                # Click the final continue button
-                click_continue_button()
-                
-                send_telegram_message("Ticket is in the basket.")
-                print("Ticket added to basket. Please continue the purchase manually.")
-        
-        # Wait for some time before checking again
-        WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-        simulate_user_activity()
-        extend_session()
-except KeyboardInterrupt:
-    print("Monitoring stopped.")
-    send_telegram_message("Monitoring stopped.")
-
-# Keep the browser open for manual continuation
-print("Script has completed. Browser will remain open for manual continuation.")
-while True:
-    time.sleep(10)
-    simulate_user_activity()
-    extend_session()
